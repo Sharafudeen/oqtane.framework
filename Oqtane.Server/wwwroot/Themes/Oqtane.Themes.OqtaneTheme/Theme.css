@@ -6,7 +6,7 @@ body {
 
 /* App Logo */
 .app-logo .img-fluid {
-    max-height: 40px;
+    max-height: 90px;
     padding: 0 5px 0 5px;
 }
 
@@ -42,21 +42,20 @@ body {
 
 .controls {
     z-index: 2000;
-    /*padding-top: 15px;
-    padding-bottom: 15px;*/
+    padding-top: 15px;
+    padding-bottom: 15px;
     margin-right: 10px;
 }
 
 .app-menu .nav-item {
     font-size: 0.9rem;
-    /*padding-bottom: 0.5rem;*/
+    padding-bottom: 0.5rem;
     white-space: nowrap;
-    margin-right: .25rem !important;
 }
 
 .app-menu .nav-item a {
     border-radius: 4px;
-    height: 2.5rem;
+    height: 3rem;
     display: flex;
     align-items: center;
     line-height: 3rem;
@@ -157,10 +156,9 @@ div.app-moduleactions a.dropdown-toggle, div.app-moduleactions div.dropdown-menu
 
     .controls {
         height: 60px;
-        top: 0px;
-        padding-top: 10px;
+        top: 15px;
         position: fixed;
-        /*top: 0px;*/
+        top: 0px;
         width: 100%;
         background-color: rgb(0, 0, 0);
     }
