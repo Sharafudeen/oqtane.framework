@@ -8,7 +8,6 @@ using Microsoft.AspNetCore.Mvc;
 using Oqtane.Infrastructure;
 using Oqtane.Models;
 using Oqtane.Shared;
-using Microsoft.Extensions.Caching.Memory;
 using System.Net;
 using Oqtane.Repository;
 using Microsoft.AspNetCore.Http;
@@ -27,15 +26,16 @@ namespace Oqtane.Controllers
         private readonly IInstallationManager _installationManager;
         private readonly IDatabaseManager _databaseManager;
         private readonly ILocalizationManager _localizationManager;
-        private readonly IMemoryCache _cache;
+        private readonly ICacheManager _cache;
         private readonly IHttpContextAccessor _accessor;
         private readonly IAliasRepository _aliases;
         private readonly ISiteRepository _sites;
         private readonly ILogger<InstallationController> _filelogger;
         private readonly ITenantManager _tenantManager;
-        private readonly IServerStateManager _serverState;
+        private readonly IModuleDefinitionRepository _moduleDefinitions;
+        private readonly IThemeRepository _themes;
 
-        public InstallationController(IConfigManager configManager, IInstallationManager installationManager, IDatabaseManager databaseManager, ILocalizationManager localizationManager, IMemoryCache cache, IHttpContextAccessor accessor, IAliasRepository aliases, ISiteRepository sites, ILogger<InstallationController> filelogger, ITenantManager tenantManager, IServerStateManager serverState)
+        public InstallationController(IConfigManager configManager, IInstallationManager installationManager, IDatabaseManager databaseManager, ILocalizationManager localizationManager, ICacheManager cache, IHttpContextAccessor accessor, IAliasRepository aliases, ISiteRepository sites, ILogger<InstallationController> filelogger, ITenantManager tenantManager, IModuleDefinitionRepository moduleDefinitions, IThemeRepository themes)
         {
             _configManager = configManager;
             _installationManager = installationManager;
@@ -47,7 +47,8 @@ namespace Oqtane.Controllers
             _sites = sites;
             _filelogger = filelogger;
             _tenantManager = tenantManager;
-            _serverState = serverState;
+            _moduleDefinitions = moduleDefinitions;
+            _themes = themes;
         }
 
         // POST api/<controller>
@@ -113,8 +114,7 @@ namespace Oqtane.Controllers
         private List<ClientAssembly> GetAssemblyList()
         {
             var alias = _tenantManager.GetAlias();
-
-            return _cache.GetOrCreate($"assemblieslist:{alias.SiteKey}", entry =>
+            return _cache.GetCache(alias, "AssembliesList", entry =>
             {
                 var assemblyList = new List<ClientAssembly>();
 
@@ -130,8 +130,9 @@ namespace Oqtane.Controllers
                         hashfilename = false;
                     }
 
-                    // get site assemblies which should be downloaded to client
-                    var assemblies = _serverState.GetServerState(alias.SiteKey).Assemblies;
+                    // get module and theme assemblies for site
+                    var assemblies = _moduleDefinitions.GetAssemblies(alias.SiteId);
+                    assemblies.Concat(_themes.GetAssemblies(alias.SiteId));
 
                     // populate assembly list
                     foreach (var assembly in assemblies)
@@ -185,10 +186,9 @@ namespace Oqtane.Controllers
         private byte[] GetAssemblies(string list)
         {
             var alias = _tenantManager.GetAlias();
-
             if (list == "*")
             {
-                return _cache.GetOrCreate($"assemblies:{alias.SiteKey}", entry =>
+                return _cache.GetCache(alias, "Assemblies", entry =>
                 {
                     return GetZIP(list, alias);
                 });

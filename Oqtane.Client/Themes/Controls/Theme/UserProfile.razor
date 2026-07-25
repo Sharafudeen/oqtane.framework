@@ -7,7 +7,7 @@
 
 @if (PageState.User != null)
 {
-    <a href="@_profileurl" class="@CssClass app-profile">@PageState.User.Username</a>
+    <a href="@_profileurl" class="@CssClass app-profile">@_displayname</a>
 }
 else
 {
@@ -31,9 +31,13 @@ else
     [Parameter]
     public string ProfileUrl { get; set; } // optional parameter to specify a custom user profile url
 
+    [Parameter]
+    public string DisplayName { get; set; }
+
     private string _registerurl = "";
     private string _profileurl = "";
     private string _returnurl = "";
+    private string _displayname = "";
 
     protected override void OnParametersSet()
     {        
@@ -81,6 +85,28 @@ else
             else
             {
                 _profileurl = NavigateUrl("profile", "returnurl=" + _returnurl);
+            }
+        }
+
+        if (PageState.User != null)
+        {
+            var displayname = DisplayName;
+            if (string.IsNullOrEmpty(displayname))
+            {
+                displayname = SettingService.GetSetting(PageState.Site.Settings, "LoginOptions:ProfileDisplayName", "username");
+            }
+
+            switch (displayname.ToLower())
+            {
+                case "displayname":
+                    _displayname = PageState.User.DisplayName;
+                    break;
+                case "email":
+                    _displayname = PageState.User.Email;
+                    break;
+                default:
+                    _displayname = PageState.User.Username;
+                    break;
             }
         }
     }

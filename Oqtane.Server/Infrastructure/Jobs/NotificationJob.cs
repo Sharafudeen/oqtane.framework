@@ -38,7 +38,7 @@ namespace Oqtane.Infrastructure
 
             // iterate through sites for current tenant
             List<Site> sites = siteRepository.GetSites().ToList();
-            foreach (Site site in sites)
+            foreach (Site site in sites.Where(item => !item.IsDeleted))
             {
                 log += "Processing Notifications For Site: " + site.Name + "<br />";
 
@@ -48,7 +48,7 @@ namespace Oqtane.Infrastructure
                     // get site settings
                     var settings = settingRepository.GetSettings(EntityNames.Site, site.SiteId, EntityNames.Host, -1);
 
-                    if (!site.IsDeleted && settingRepository.GetSettingValue(settings, "SMTPEnabled", "True") == "True")
+                    if (settingRepository.GetSettingValue(settings, "SMTPEnabled", "True") == "True")
                     {
                         bool valid = true;
                         if (settingRepository.GetSettingValue(settings, "SMTPAuthentication", "Basic") == "Basic")
@@ -121,11 +121,23 @@ namespace Oqtane.Infrastructure
                             {
                                 if (settingRepository.GetSettingValue(settings, "SMTPAuthentication", "Basic") == "Basic")
                                 {
-                                    // it is possible to use basic without any authentication (not recommended)
                                     if (settingRepository.GetSettingValue(settings, "SMTPUsername", "") != "" && settingRepository.GetSettingValue(settings, "SMTPPassword", "") != "")
                                     {
-                                        await client.AuthenticateAsync(settingRepository.GetSettingValue(settings, "SMTPUsername", ""),
+                                        try
+                                        {
+                                            await client.AuthenticateAsync(settingRepository.GetSettingValue(settings, "SMTPUsername", ""),
                                             settingRepository.GetSettingValue(settings, "SMTPPassword", ""));
+                                        }
+                                        catch (Exception ex)
+                                        {
+                                            log += "SMTP Not Configured Properly In Site Settings - Basic Authentication Failed Using Username And Password - " + ex.Message + "<br />";
+                                            valid = false;
+                                        }
+
+                                    }
+                                    else
+                                    {
+                                        // it is possible to use basic without any authentication (not recommended)
                                     }
                                 }
                                 else
@@ -160,7 +172,7 @@ namespace Oqtane.Infrastructure
                                     var toEmail = notification.ToEmail ?? "";
                                     var toName = notification.ToDisplayName ?? "";
 
-                                    // get sender and receiver information from user information if available
+                                    // get sender from user information if "from" email or name is not specified and user id is available
                                     if ((string.IsNullOrEmpty(fromEmail) || string.IsNullOrEmpty(fromName)) && notification.FromUserId != null)
                                     {
                                         var user = userRepository.GetUser(notification.FromUserId.Value);
@@ -170,6 +182,9 @@ namespace Oqtane.Infrastructure
                                             fromName = string.IsNullOrEmpty(fromName) ? user.DisplayName ?? "" : fromName;
                                         }
                                     }
+                                    fromName = string.IsNullOrEmpty(fromName) ? site.Name : fromName;
+
+                                    // get recipient from user information if "to" email or name is not specified and user id is available
                                     if ((string.IsNullOrEmpty(toEmail) || string.IsNullOrEmpty(toName)) && notification.ToUserId != null)
                                     {
                                         var user = userRepository.GetUser(notification.ToUserId.Value);
@@ -181,30 +196,34 @@ namespace Oqtane.Infrastructure
                                     }
 
                                     // create mailbox addresses
-                                    MailboxAddress to = null;
                                     MailboxAddress from = null;
+                                    MailboxAddress to = null;
+                                    MailboxAddress replyTo = null;
                                     var mailboxAddressValidationError = "";
 
-                                    // sender
-                                    if (settingRepository.GetSettingValue(settings, "SMTPRelay", "False") != "True")
+                                    // always send from SMTP Sender
+                                    if (MailboxAddress.TryParse(settingRepository.GetSettingValue(settings, "SMTPSender", ""), out from))
                                     {
-                                        fromEmail = settingRepository.GetSettingValue(settings, "SMTPSender", "");
-                                        fromName = string.IsNullOrEmpty(fromName) ? site.Name : fromName;
-                                    }
-                                    if (MailboxAddress.TryParse(fromEmail, out from))
-                                    {
-                                        from.Name = fromName;
+                                        from.Name = fromName; 
                                     }
                                     else
                                     {
+                                        mailboxAddressValidationError += $" Invalid Sender: {fromName} &lt;{settingRepository.GetSettingValue(settings, "SMTPSender", "")}&gt;";
+                                    }
 
-                                        mailboxAddressValidationError += $" Invalid Sender: {fromName} &lt;{fromEmail}&gt;";
+                                    // reply to
+                                    if (!string.IsNullOrEmpty(fromEmail) && fromEmail != from.Address)
+                                    {
+                                        if (MailboxAddress.TryParse(fromEmail, out replyTo))
+                                        {
+                                            replyTo.Name = fromName; 
+                                        }
                                     }
 
                                     // recipient
                                     if (MailboxAddress.TryParse(toEmail, out to))
                                     {
-                                        to.Name = toName;
+                                        to.Name = toName; 
                                     }
                                     else
                                     {
@@ -218,6 +237,10 @@ namespace Oqtane.Infrastructure
                                         MimeMessage mailMessage = new MimeMessage();
                                         mailMessage.From.Add(from);
                                         mailMessage.To.Add(to);
+                                        if (replyTo != null)
+                                        {
+                                            mailMessage.ReplyTo.Add(replyTo);
+                                        }
 
                                         // subject
                                         mailMessage.Subject = notification.Subject;
@@ -267,7 +290,7 @@ namespace Oqtane.Infrastructure
                     }
                     else
                     {
-                        log += "Site Deleted Or SMTP Disabled In Site Settings<br />";
+                        log += "SMTP Disabled In Site Settings<br />";
                     }
                 }
                 else

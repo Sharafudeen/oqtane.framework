@@ -1,3 +1,8 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Reflection;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -7,11 +12,6 @@ using Oqtane.Infrastructure.SiteTemplates;
 using Oqtane.Models;
 using Oqtane.Repository;
 using Oqtane.Shared;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Reflection;
 
 namespace Oqtane.Infrastructure
 {
@@ -78,9 +78,6 @@ namespace Oqtane.Infrastructure
                     case "5.2.1":
                         Upgrade_5_2_1(tenant, scope);
                         break;
-                    case "6.1.0":
-                        Upgrade_6_1_0(tenant, scope);
-                        break;
                     case "6.1.1":
                         Upgrade_6_1_1(tenant, scope);
                         break;
@@ -92,6 +89,15 @@ namespace Oqtane.Infrastructure
                         break;
                     case "6.2.1":
                         Upgrade_6_2_1(tenant, scope);
+                        break;
+                    case "10.0.4":
+                        Upgrade_10_0_4(tenant, scope);
+                        break;
+                    case "10.1.0":
+                        Upgrade_10_1_0(tenant, scope);
+                        break;
+                    case "10.2.0":
+                        Upgrade_10_2_0(tenant, scope);
                         break;
                 }
             }
@@ -447,16 +453,6 @@ namespace Oqtane.Infrastructure
             AddPagesToSites(scope, tenant, pageTemplates);
         }
 
-        private void Upgrade_6_1_0(Tenant tenant, IServiceScope scope)
-        {
-            // remove MySql.EntityFrameworkCore package (replaced by Pomelo.EntityFrameworkCore.MySql)
-            string[] assemblies = {
-                "MySql.EntityFrameworkCore.dll"
-            };
-
-            RemoveAssemblies(tenant, assemblies, "6.1.0");
-        }
-
         private void Upgrade_6_1_1(Tenant tenant, IServiceScope scope)
         {
             var localizer = scope.ServiceProvider.GetRequiredService<IStringLocalizer<AdminSiteTemplate>>();
@@ -600,6 +596,63 @@ namespace Oqtane.Infrastructure
             };
 
             RemoveFiles(tenant, files, "6.2.1");
+        }
+
+        private void Upgrade_10_0_4(Tenant tenant, IServiceScope scope)
+        {
+            // remove Pomelo.EntityFrameworkCore.MySql package (replaced by MySql.EntityFrameworkCore)
+            string[] assemblies = {
+                "Pomelo.EntityFrameworkCore.MySql.dll"
+            };
+
+            RemoveAssemblies(tenant, assemblies, "10.0.4");
+        }
+
+        private void Upgrade_10_1_0(Tenant tenant, IServiceScope scope)
+        {
+            var pageTemplates = new List<PageTemplate>
+            {
+                new PageTemplate
+                {
+                    Update = false,
+                    Name = "Global Replace",
+                    Parent = "Admin",
+                    Order = 23,
+                    Path = "admin/replace",
+                    Icon = Icons.LoopSquare,
+                    IsNavigation = false,
+                    IsPersonalizable = false,
+                    PermissionList = new List<Permission>
+                    {
+                        new Permission(PermissionNames.View, RoleNames.Admin, true),
+                        new Permission(PermissionNames.Edit, RoleNames.Admin, true)
+                    },
+                    PageTemplateModules = new List<PageTemplateModule>
+                    {
+                        new PageTemplateModule
+                        {
+                            ModuleDefinitionName = typeof(Oqtane.Modules.Admin.GlobalReplace.Index).ToModuleDefinitionName(), Title = "Global Replace", Pane = PaneNames.Default,
+                            PermissionList = new List<Permission>
+                            {
+                                new Permission(PermissionNames.View, RoleNames.Admin, true),
+                                new Permission(PermissionNames.Edit, RoleNames.Admin, true)
+                            },
+                            Content = ""
+                        }
+                    }
+                }
+            };
+
+            AddPagesToSites(scope, tenant, pageTemplates);
+        }
+
+        private void Upgrade_10_2_0(Tenant tenant, IServiceScope scope)
+        {
+            if (tenant.Name == TenantNames.Master)
+            {
+                // prevent verbose logging to the console by ZiggyCreatures.Caching.Fusion library
+                _configManager.AddOrUpdateSetting("Logging:LogLevel:ZiggyCreatures.Caching.Fusion", "Warning", true);
+            }
         }
 
         private void AddPagesToSites(IServiceScope scope, Tenant tenant, List<PageTemplate> pageTemplates)

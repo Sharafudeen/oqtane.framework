@@ -158,11 +158,17 @@
 
         // verify user is authenticated for current site
         var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
-        if (authState.User.Identity.IsAuthenticated && authState.User.Claims.Any(item => item.Type == Constants.SiteKeyClaimType && item.Value == SiteState.Alias.SiteKey))
+        if (authState.User.IsAuthenticated() && authState.User.SiteKey() == SiteState.Alias.SiteKey)
         {
-            // get user
-            var userid = int.Parse(authState.User.Claims.First(item => item.Type == ClaimTypes.NameIdentifier).Value);
-            user = await UserService.GetUserAsync(userid, SiteState.Alias.SiteId);
+            if (PageState == null || PageState.User == null || PageState.User.UserId != authState.User.UserId())
+            {
+                // get user
+                user = await UserService.GetUserAsync(authState.User.UserId(), SiteState.Alias.SiteId);
+            }
+            else
+            {
+                user = PageState.User;
+            }
             if (user != null)
             {
                 user.IsAuthenticated = authState.User.Identity.IsAuthenticated;
@@ -227,15 +233,8 @@
 
             if (page == null && route.PagePath == "") // naked path refers to site home page
             {
-                if (site.HomePageId != null)
-                {
-                    page = site.Pages.FirstOrDefault(item => item.PageId == site.HomePageId);
-                }
-                if (page == null)
-                {
-                    // fallback to use the first page in the collection
-                    page = site.Pages.FirstOrDefault();
-                }
+                // fallback to use the first page in the collection
+                page = site.Pages.FirstOrDefault();
             }
             if (page == null)
             {
@@ -626,11 +625,11 @@
             {
                 if (resource.ResourceType == ResourceType.Stylesheet || resource.Level != ResourceLevel.Site)
                 {
-                    if (resource.Url.StartsWith("~"))
+                    if (!string.IsNullOrEmpty(resource.Url) && resource.Url.StartsWith("~"))
                     {
                         resource.Url = resource.Url.Replace("~", "/" + type + "/" + name + "/").Replace("//", "/");
                     }
-                    if (!resource.Url.Contains("://") && alias.BaseUrl != "" && !resource.Url.StartsWith(alias.BaseUrl))
+                    if (!string.IsNullOrEmpty(resource.Url) && !resource.Url.Contains("://") && alias.BaseUrl != "" && !resource.Url.StartsWith(alias.BaseUrl))
                     {
                         resource.Url = alias.BaseUrl + resource.Url;
                     }

@@ -4,14 +4,12 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
-
 using NodaTime;
-using NodaTime.Extensions;
-
 using Oqtane.Models;
-
 using File = Oqtane.Models.File;
 using TimeZone = Oqtane.Models.TimeZone;
 
@@ -98,7 +96,7 @@ namespace Oqtane.Shared
         {
             var aliasUrl = (alias != null && !string.IsNullOrEmpty(alias.Path)) ? "/" + alias.Path : "";
             var querystring = (download) ? "?download" : "";
-            return $"{alias?.BaseUrl}{aliasUrl}{Constants.FileUrl}{folderpath.Replace("\\", "/")}{filename}{querystring}";
+            return $"{alias?.BaseUrl}{aliasUrl}{Constants.FileUrl}{EncodeFolderPath(folderpath)}{WebUtility.UrlEncode(filename)}{querystring}";
         }
 
         public static string FileUrl(Alias alias, int fileid)
@@ -135,7 +133,7 @@ namespace Oqtane.Shared
             background = string.IsNullOrEmpty(background) ? "transparent" : background;
             format = string.IsNullOrEmpty(format) ? "png" : format;
             var querystring = $"?width={width}&height={height}&mode={mode}&position={position}&background={background}&rotate={rotate}&format={format}&recreate={recreate}";
-            return $"{alias?.BaseUrl}{aliasUrl}{Constants.FileUrl}{folderpath.Replace("\\", "/")}{filename}{querystring}";
+            return $"{alias?.BaseUrl}{aliasUrl}{Constants.FileUrl}{EncodeFolderPath(folderpath)}{WebUtility.UrlEncode(filename)}{querystring}";
         }
 
         public static string TenantUrl(Alias alias, string url)
@@ -143,6 +141,21 @@ namespace Oqtane.Shared
             url = (!url.StartsWith("/")) ? "/" + url : url;
             url = (alias != null && !string.IsNullOrEmpty(alias.Path)) ? "/" + alias.Path + url : url;
             return $"{alias?.BaseUrl}{url}";
+        }
+
+        public static string EncodeFolderPath(string folderPath)
+        {
+            if (!string.IsNullOrEmpty(folderPath))
+            {
+                folderPath = folderPath.Replace("\\", "/");
+                var segments = folderPath.Split('/');
+                for (int i = 0; i < segments.Length; i++)
+                {
+                    segments[i] = WebUtility.UrlEncode(segments[i]);
+                }
+                return string.Join("/", segments);
+            }
+            return folderPath;
         }
 
         public static string AddUrlParameters(params object[] parameters)
@@ -241,6 +254,7 @@ namespace Oqtane.Shared
             string result = "";
             if (url != null)
             {
+                url = url.Replace("'", ""); // remove apostrophes
                 var normalizedString = WebUtility.UrlDecode(url).ToLowerInvariant().Normalize(NormalizationForm.FormD);
                 var stringBuilder = new StringBuilder();
                 var stringLength = normalizedString.Length;
@@ -255,9 +269,13 @@ namespace Oqtane.Shared
                         case UnicodeCategory.UppercaseLetter:
                         case UnicodeCategory.DecimalDigitNumber:
                             if (c < 128)
+                            {
                                 stringBuilder.Append(c);
+                            }
                             else
+                            {
                                 stringBuilder.Append(RemapInternationalCharToAscii(c));
+                            }
                             prevdash = false;
                             break;
 
@@ -271,7 +289,6 @@ namespace Oqtane.Shared
                                 stringBuilder.Append('-');
                                 prevdash = true;
                             }
-
                             break;
                     }
                 }
@@ -499,11 +516,11 @@ namespace Oqtane.Shared
 
         public static string GetUrlPath(string url)
         {
-            if (url.Contains("?"))
+            if (!string.IsNullOrEmpty(url) && url.Contains("?"))
             {
                 url = url.Substring(0, url.IndexOf("?"));
             }
-            return url;
+            return url ?? "";
         }
 
         public static string LogMessage(object @class, string message)
@@ -748,6 +765,75 @@ namespace Oqtane.Shared
                 }
                 return hash.ToString("X8");
             }
+        }
+
+        public static IEnumerable<PropertyInfo> GetPropertiesIncludingInherited(Type type, BindingFlags bindingFlags)
+        {
+            var dictionary = new Dictionary<string, object>(StringComparer.Ordinal);
+
+            var currentType = type;
+            while (currentType != null)
+            {
+                var properties = currentType.GetProperties(bindingFlags | BindingFlags.DeclaredOnly);
+                foreach (var property in properties)
+                {
+                    if (!dictionary.TryGetValue(property.Name, out var others))
+                    {
+                        dictionary.Add(property.Name, property);
+                    }
+                    else if (!IsInheritedProperty(property, others))
+                    {
+                        List<PropertyInfo> many;
+                        if (others is PropertyInfo single)
+                        {
+                            many = new List<PropertyInfo> { single };
+                            dictionary[property.Name] = many;
+                        }
+                        else
+                        {
+                            many = (List<PropertyInfo>)others;
+                        }
+                        many.Add(property);
+                    }
+                }
+
+                currentType = currentType.BaseType;
+            }
+
+            foreach (var item in dictionary)
+            {
+                if (item.Value is PropertyInfo property)
+                {
+                    yield return property;
+                    continue;
+                }
+
+                var list = (List<PropertyInfo>)item.Value;
+                var count = list.Count;
+                for (var i = 0; i < count; i++)
+                {
+                    yield return list[i];
+                }
+            }
+        }
+
+        private static bool IsInheritedProperty(PropertyInfo property, object others)
+        {
+            if (others is PropertyInfo single)
+            {
+                return single.GetMethod?.GetBaseDefinition() == property.GetMethod?.GetBaseDefinition();
+            }
+
+            var many = (List<PropertyInfo>)others;
+            foreach (var other in CollectionsMarshal.AsSpan(many))
+            {
+                if (other.GetMethod?.GetBaseDefinition() == property.GetMethod?.GetBaseDefinition())
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         [Obsolete("ContentUrl(Alias alias, int fileId) is deprecated. Use FileUrl(Alias alias, int fileId) instead.", false)]

@@ -31,9 +31,8 @@ namespace Oqtane.Models
 
         /// <summary>
         /// Language Name - corresponds to <see cref="Culture.DisplayName"/>, _not_ <see cref="Culture.Name"/>
-        /// Note that this property still exists in the database because columns cannot be dropped in SQLite
-        /// Therefore the property must be retained/mapped even though the framework populates it from the Culture API
         /// </summary>
+        [NotMapped]
         public string Name { get; set; }
 
         [NotMapped]
@@ -41,6 +40,12 @@ namespace Oqtane.Models
         /// Version of the satellite assembly
         /// </summary>
         public string Version { get; set; }
+
+        [NotMapped]
+        /// <summary>
+        /// The primary alias name for the site with this language
+        /// </summary>
+        public string AliasName { get; set; }
 
         public Language Clone()
         {
@@ -51,7 +56,8 @@ namespace Oqtane.Models
                 Name = Name,
                 Code = Code,
                 IsDefault = IsDefault,
-                Version = Version
+                Version = Version,
+                AliasName = AliasName
             };
         }
     }

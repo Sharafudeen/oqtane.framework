@@ -97,11 +97,18 @@ namespace Oqtane.Services
         Task<User> VerifyEmailAsync(User user, string token);
 
         /// <summary>
-        /// Trigger a forgot-password e-mail for this <see cref="User"/>. 
+        /// Trigger a forgot-password e-mail. 
         /// </summary>
-        /// <param name="user"></param>
+        /// <param name="username"></param>
         /// <returns></returns>
-        Task ForgotPasswordAsync(User user);
+        Task<bool> ForgotPasswordAsync(string username);
+
+        /// <summary>
+        /// Trigger a username reminder e-mail. 
+        /// </summary>
+        /// <param name="email"></param>
+        /// <returns></returns>
+        Task<bool> ForgotUsernameAsync(string email);
 
         /// <summary>
         /// Reset the password of this <see cref="User"/>
@@ -142,6 +149,14 @@ namespace Oqtane.Services
         Task<string> GetTokenAsync();
 
         /// <summary>
+        /// Get token for current user
+        /// </summary>
+        /// <param name="username"></param>
+        /// <param name="password"></param>
+        /// <returns></returns>
+        Task<string> GetTokenAsync(string username, string password);
+
+        /// <summary>
         /// Get personal access token for current user (administrators only)
         /// </summary>
         /// <returns></returns>
@@ -153,15 +168,6 @@ namespace Oqtane.Services
         /// <param name="siteId">ID of a <see cref="Site"/></param>
         /// <returns></returns>
         Task<string> GetPasswordRequirementsAsync(int siteId);
-
-        /// <summary>
-        /// Bulk import of users
-        /// </summary>
-        /// <param name="siteId">ID of a <see cref="Site"/></param>
-        /// <param name="fileId">ID of a <see cref="File"/></param>
-        /// <param name="notify">Indicates if new users should be notified by email</param>
-        /// <returns></returns>
-        Task<Dictionary<string, string>> ImportUsersAsync(int siteId, int fileId, bool notify);
 
         /// <summary>
         /// Get passkeys for a user
@@ -211,6 +217,13 @@ namespace Oqtane.Services
         /// <param name="key"></param>
         /// <returns></returns>
         Task DeleteLoginAsync(int userId, string provider, string key);
+
+        /// <summary>
+        /// Send a login link
+        /// </summary>
+        /// <param name="email"></param>
+        /// <returns></returns>
+        Task<bool> SendLoginLinkAsync(string email, string returnurl);
     }
 
     [PrivateApi("Don't show in the documentation, as everything should use the Interface")]
@@ -275,9 +288,14 @@ namespace Oqtane.Services
             return await PostJsonAsync<User>($"{Apiurl}/verify?token={token}", user);
         }
 
-        public async Task ForgotPasswordAsync(User user)
+        public async Task<bool> ForgotPasswordAsync(string username)
         {
-            await PostJsonAsync($"{Apiurl}/forgot", user);
+            return await GetJsonAsync<bool>($"{Apiurl}/forgotpassword/{WebUtility.UrlEncode(username)}");
+        }
+
+        public async Task<bool> ForgotUsernameAsync(string email)
+        {
+            return await GetJsonAsync<bool>($"{Apiurl}/forgotusername/{WebUtility.UrlEncode(email)}");
         }
 
         public async Task<User> ResetPasswordAsync(User user, string token)
@@ -305,6 +323,11 @@ namespace Oqtane.Services
             return await GetStringAsync($"{Apiurl}/token");
         }
 
+        public async Task<string> GetTokenAsync(string username, string password)
+        {
+            return await GetStringAsync($"{Apiurl}/token?username={WebUtility.UrlEncode(username)}&password={WebUtility.UrlEncode(password)}");
+        }
+
         public async Task<string> GetPersonalAccessTokenAsync()
         {
             return await GetStringAsync($"{Apiurl}/personalaccesstoken");
@@ -330,11 +353,6 @@ namespace Oqtane.Services
 
             // format requirements
             return string.Format(passwordValidationCriteriaTemplate, minimumlength, uniquecharacters, digitRequirement, uppercaseRequirement, lowercaseRequirement, punctuationRequirement);
-        }
-
-        public async Task<Dictionary<string, string>> ImportUsersAsync(int siteId, int fileId, bool notify)
-        {
-            return await PostJsonAsync<Dictionary<string, string>>($"{Apiurl}/import?siteid={siteId}&fileid={fileId}&notify={notify}", null);
         }
 
         public async Task<List<UserPasskey>> GetPasskeysAsync(int userId)
@@ -365,6 +383,11 @@ namespace Oqtane.Services
         public async Task DeleteLoginAsync(int userId, string provider, string key)
         {
             await DeleteAsync($"{Apiurl}/login?id={userId}&provider={provider}&key={key}");
+        }
+
+        public async Task<bool> SendLoginLinkAsync(string email, string returnurl)
+        {
+            return await GetJsonAsync<bool>($"{Apiurl}/loginlink/{WebUtility.UrlEncode(email)}?returnurl={WebUtility.UrlEncode(returnurl)}");
         }
     }
 }

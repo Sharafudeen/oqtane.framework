@@ -1,11 +1,12 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Oqtane.Shared;
 
 namespace Oqtane.Infrastructure
@@ -31,10 +32,53 @@ namespace Oqtane.Infrastructure
     public class ConfigManager : IConfigManager
     {
         private readonly IConfigurationRoot _config;
+        private readonly IWebHostEnvironment _environment;
+        private readonly ILogger<ConfigManager> _filelogger;
 
-        public ConfigManager(IConfigurationRoot config)
+        private static string appsettingsPath = "";
+        private static string appsettingsFilename = "";
+
+        public ConfigManager(IConfigurationRoot config, IWebHostEnvironment environment, ILogger<ConfigManager> filelogger)
         {
             _config = config;
+            _environment = environment;
+            _filelogger = filelogger;
+
+            appsettingsPath = GetAppSettingsOverridePath();
+            if (!string.IsNullOrEmpty(appsettingsPath))
+            {
+                appsettingsFilename = GetAppSettingsOverrideFilename();
+            }
+            if (string.IsNullOrEmpty(appsettingsFilename))
+            {
+                appsettingsPath = Directory.GetCurrentDirectory();
+                appsettingsFilename = $"appsettings.{_environment.EnvironmentName}.json";
+                if (_environment.EnvironmentName == "Development" || !File.Exists(Path.Combine(appsettingsPath, appsettingsFilename)))
+                {
+                    appsettingsFilename = "appsettings.json"; // fallback
+                }
+            }
+        }
+
+        public static string GetAppSettingsOverridePath()
+        {
+            var appSettingsOverrideFilePath = Environment.GetEnvironmentVariable(Constants.AppSettingsOverrideEnvironmentVariable);
+            if (!string.IsNullOrEmpty(appSettingsOverrideFilePath) && Directory.Exists(appSettingsOverrideFilePath))
+            {
+                return appSettingsOverrideFilePath;
+            }
+            return null;
+        }
+
+        public static string GetAppSettingsOverrideFilename()
+        {
+            var appSettingsOverrideFilePath = GetAppSettingsOverridePath();
+            if (!string.IsNullOrEmpty(appSettingsOverrideFilePath))
+            {
+                var appSettingsOverrideFileName = Path.Combine(appSettingsOverrideFilePath, "appsettings.override.json");
+                return File.Exists(appSettingsOverrideFileName) ? appSettingsOverrideFileName : null;
+            }
+            return null;
         }
 
         public IConfigurationSection GetSection(string key)
@@ -74,14 +118,14 @@ namespace Oqtane.Infrastructure
 
         public void AddOrUpdateSetting<T>(string key, T value, bool reload)
         {
-            AddOrUpdateSetting("appsettings.json", key, value, reload);
+            AddOrUpdateSetting(appsettingsFilename, key, value, reload);
         }
 
         public void AddOrUpdateSetting<T>(string file, string key, T value, bool reload)
         {
             try
             {
-                var path = Path.Combine(Directory.GetCurrentDirectory(), file);
+                var path = Path.Combine(appsettingsPath, file);
                 JsonNode node = JsonNode.Parse(File.ReadAllText(path));
                 SetValueRecursively(node, key, value);
                 File.WriteAllText(path, JsonSerializer.Serialize(node, new JsonSerializerOptions() { WriteIndented = true }));
@@ -89,20 +133,20 @@ namespace Oqtane.Infrastructure
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Oqtane Error: Error Updating App Setting {key} - {ex}");
+                _filelogger.LogError(Utilities.LogMessage(this, $"Oqtane Error: Error Updating App Setting {key} - {ex}"));
             }
         }
 
         public void RemoveSetting(string key, bool reload)
         {
-            RemoveSetting("appsettings.json", key, reload);
+            RemoveSetting(appsettingsFilename, key, reload);
         }
 
         public void RemoveSetting(string file, string key, bool reload)
         {
             try
             {
-                var path = Path.Combine(Directory.GetCurrentDirectory(), file);
+                var path = Path.Combine(appsettingsPath, file);
                 JsonNode node = JsonNode.Parse(File.ReadAllText(path));
                 RemovePropertyRecursively(node, key);
                 File.WriteAllText(path, JsonSerializer.Serialize(node, new JsonSerializerOptions() { WriteIndented = true }));
@@ -110,7 +154,7 @@ namespace Oqtane.Infrastructure
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Oqtane Error: Error Removing App Setting {key} - {ex}");
+                _filelogger.LogError(Utilities.LogMessage(this, $"Oqtane Error: Error Removing App Setting {key} - {ex}"));
             }
         }
 

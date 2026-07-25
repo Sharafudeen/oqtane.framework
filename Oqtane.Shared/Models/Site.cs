@@ -17,11 +17,6 @@ namespace Oqtane.Models
         public int SiteId { get; set; }
 
         /// <summary>
-        /// Reference to the <see cref="Tenant"/> the Site is in
-        /// </summary>
-        public int TenantId { get; set; }
-
-        /// <summary>
         /// The site Name
         /// </summary>
         public string Name { get; set; }
@@ -30,6 +25,11 @@ namespace Oqtane.Models
         /// The default time zone for the site
         /// </summary>
         public string TimeZoneId { get; set; }
+
+        /// <summary>
+        /// The default culture for the site (ie. en-US)
+        /// </summary>
+        public string CultureCode { get; set; }
 
         /// <summary>
         /// Reference to a <see cref="File"/> which has the Logo for this site.
@@ -101,7 +101,7 @@ namespace Oqtane.Models
         public string RenderMode { get; set; }
 
         /// <summary>
-        /// The render mode for UI components which require interactivity ie. Server,WebAssembly,Auto
+        /// The hosting model for UI components which require interactivity ie. Server,WebAssembly,Auto
         /// </summary>
         public string Runtime { get; set; }
 
@@ -116,14 +116,14 @@ namespace Oqtane.Models
         public bool Hybrid { get; set; }
 
         /// <summary>
+        /// Indicates if enhanced navigation should be used with static rendering
+        /// </summary>
+        public bool EnhancedNavigation { get; set; }
+
+        /// <summary>
         /// Keeps track of site configuration changes and is used by the ISiteMigration interface
         /// </summary>
         public string Version { get; set; }
-
-        /// <summary>
-        /// The home page of the site - the "/" path will be used by default if no home page is specified
-        /// </summary>
-        public int? HomePageId { get; set; }
 
         /// <summary>
         /// Content to be included in the head of the page
@@ -193,19 +193,31 @@ namespace Oqtane.Models
         public List<Theme> Themes { get; set; }
 
         /// <summary>
+        /// Current user
+        /// </summary>
+        [NotMapped]
+        public User User { get; set; }
+
+        /// <summary>
         /// fingerprint for framework static assets
         /// </summary>
         [NotMapped]
         public string Fingerprint { get; set; }
+
+        /// <summary>
+        /// Reference to the <see cref="Tenant"/> the Site belongs to
+        /// </summary>
+        [NotMapped]
+        public int TenantId { get; set; }
 
         public Site Clone()
         {
             return new Site
             {
                 SiteId = SiteId,
-                TenantId = TenantId,
                 Name = Name,
                 TimeZoneId = TimeZoneId,
+                CultureCode = CultureCode,
                 LogoFileId = LogoFileId,
                 FaviconFileId = FaviconFileId,
                 DefaultThemeType = DefaultThemeType,
@@ -222,8 +234,8 @@ namespace Oqtane.Models
                 Runtime = Runtime,
                 Prerender = Prerender,
                 Hybrid = Hybrid,
+                EnhancedNavigation = EnhancedNavigation,
                 Version = Version,
-                HomePageId = HomePageId,
                 HeadContent = HeadContent,
                 BodyContent = BodyContent,
                 IsDeleted = IsDeleted,
@@ -240,7 +252,9 @@ namespace Oqtane.Models
                 Pages = Pages.ConvertAll(page => page.Clone()),
                 Languages = Languages.ConvertAll(language => language.Clone()),
                 Themes = Themes,
-                Fingerprint = Fingerprint
+                User = User?.Clone(),
+                Fingerprint = Fingerprint,
+                TenantId = TenantId
             };
         }
 
@@ -248,6 +262,10 @@ namespace Oqtane.Models
         [NotMapped]
         [Obsolete("This property is deprecated.", false)]
         public string DefaultLayoutType { get; set; }
+
+        [NotMapped]
+        [Obsolete("This property is deprecated.", false)]
+        public int? HomePageId { get; set; }
         #endregion
     }
 }

@@ -10,6 +10,7 @@
     <StaticWebAssetsFingerprintContent>false</StaticWebAssetsFingerprintContent>
     <StaticWebAssetBasePath>/</StaticWebAssetBasePath>
     <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
+    <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
   </PropertyGroup>
   <ItemGroup>
     <Compile Remove="wwwroot\Modules\Templates\**" />
@@ -20,6 +21,7 @@
     <Content Remove="wwwroot\_content\*\**" />
     <EmbeddedResource Remove="wwwroot\Modules\Templates\**" />
     <EmbeddedResource Remove="wwwroot\Themes\Templates\**" />
+    <None Remove="wwwroot\Modules\Templates\**" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="Scripts\MigrateMaster.sql" />
@@ -27,28 +29,32 @@
   </ItemGroup>
   
   <ItemGroup>
-    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="10.0.0" />
-    <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.0" />
-    <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="10.0.0" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.0" />
-    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.12" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="10.0.10" />
+    <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.10" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="10.0.10" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.10" />
+    <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="10.0.10" />
+    <PackageReference Include="SixLabors.ImageSharp" Version="[3.1.12]" /> <!-- ImageSharp 3.1.12 is pinned as to license compatibility -->
     <PackageReference Include="HtmlAgilityPack" Version="1.12.4" />
-    <PackageReference Include="Swashbuckle.AspNetCore" Version="10.0.0" />
-    <PackageReference Include="MailKit" Version="4.14.1" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="10.2.3" />
+    <PackageReference Include="MailKit" Version="4.17.0" />
+    <PackageReference Include="ZiggyCreatures.FusionCache" Version="2.6.0" />
+    <PackageReference Include="ZiggyCreatures.FusionCache.Serialization.SystemTextJson" Version="2.6.0" />
+    <PackageReference Include="ZiggyCreatures.FusionCache.Backplane.StackExchangeRedis" Version="2.6.0" />
   </ItemGroup>
-  
+
   <ItemGroup>
     <!-- MySQL Database Provider Dependencies -->
-    <PackageReference Include="MySql.Data" Version="9.5.0" />
-    <PackageReference Include="Pomelo.EntityFrameworkCore.MySql" Version="9.0.0" />
+    <PackageReference Include="MySql.Data" Version="9.7.0" />
+    <PackageReference Include="MySql.EntityFrameworkCore" Version="10.0.7" />
     <!-- PostgreSQL Database Provider Dependencies -->
-    <PackageReference Include="EFCore.NamingConventions" Version="10.0.0-rc.2" />
-    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.0-rc.2" />
+    <PackageReference Include="EFCore.NamingConventions" Version="10.0.1" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
     <!-- SQLite Database Provider Dependencies -->
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.0" />
-    <PackageReference Include="Microsoft.Data.Sqlite.Core" Version="10.0.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.10" />
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.3" />
     <!-- SQL Server Database Provider Dependencies -->
-    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.10" />
   </ItemGroup>
 
   <!-- Suppress EF Core internal warnings for Database Providers -->
@@ -77,5 +83,9 @@
   <ItemGroup>
     <!-- extends watching group to include *.dll files and exclude the ones cause an infinite loop -->
     <Watch Include="**\*.dll" Exclude="**\Microsoft.EntityFrameworkCore.*.dll;**\Oqtane.Database.*.dll;" />
+  </ItemGroup>
+  
+  <ItemGroup>
+    <Watch Remove="wwwroot\Modules\Templates\**" />
   </ItemGroup>
 </Project>

@@ -1,4 +1,5 @@
 @namespace Oqtane.Modules.Admin.UserProfile
+@using System.Globalization
 @using System.Net
 @using System.Text.RegularExpressions;
 @inherits ModuleBase
@@ -10,6 +11,7 @@
 @inject IFileService FileService
 @inject IFolderService FolderService
 @inject ITimeZoneService TimeZoneService
+@inject ILanguageService LanguageService
 @inject IJSRuntime jsRuntime
 @inject IServiceProvider ServiceProvider
 @inject IStringLocalizer<Index> Localizer
@@ -54,6 +56,18 @@
                             @foreach (var timezone in _timezones)
                             {
                                 <option value="@timezone.Id">@timezone.DisplayName</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+                <div class="row mb-1 align-items-center">
+                    <Label Class="col-sm-3" For="culture" HelpText="Your preferred language. Note that you will only be able to choose from languages supported on this site." ResourceKey="CultureCode">Language:</Label>
+                    <div class="col-sm-9">
+                        <select id="culture" class="form-select" @bind="@_culturecode">
+                            <option value="">&lt;@SharedLocalizer["Not Specified"]&gt;</option>
+                            @foreach (var language in _languages)
+                            {
+                                <option value="@language.Code">@language.Name</option>
                             }
                         </select>
                     </div>
@@ -114,9 +128,9 @@
             }
             @if (_allowpasskeys)
             {
-                <Section Name="Passkeys" Heading="Passkeys" ResourceKey="Passkeys">
+                <Section Name="Passkeys" Heading="Passkeys" ResourceKey="Passkeys" Expanded="@((_passkeys.Count > 0).ToString())">
                     <button type="button" class="btn btn-primary" @onclick="AddPasskey">@SharedLocalizer["Add"]</button>
-                    @if (_passkeys != null && _passkeys.Count > 0)
+                    @if (_passkeys.Count > 0)
                     {
                         <Pager Items="@_passkeys">
                             <Header>
@@ -142,15 +156,15 @@
                     }
                     else
                     {
-                        <div>@Localizer["Message.Passkeys.None"]</div>
+                        <div class="mt-2">@Localizer["Message.Passkeys.None"]</div>
                     }
                 </Section>
                 <br />
             }
             @if (_allowexternallogin)
             {
-                <Section Name="Logins" Heading="Logins" ResourceKey="Logins">
-                    @if (_logins != null && _logins.Count > 0)
+                <Section Name="Logins" Heading="Logins" ResourceKey="Logins" Expanded="@((_logins.Count > 0).ToString())">
+                    @if (_logins.Count > 0)
                     {
                         <Pager Items="@_logins">
                             <Header>
@@ -165,7 +179,7 @@
                     }
                     else
                     {
-                        <div>@Localizer["Message.Logins.None"]</div>
+                        <div class="mt-2">@Localizer["Message.Logins.None"]</div>
                     }
                 </Section>
                 <br />
@@ -448,6 +462,9 @@
 @code {
     public override SecurityAccessLevel SecurityAccessLevel => SecurityAccessLevel.View;
 
+    private List<Models.TimeZone> _timezones;
+    private IEnumerable<Language> _languages;
+
     private bool _initialized = false;
     private bool _allowtwofactor = false;
     private bool _allowpasskeys = false;
@@ -458,8 +475,8 @@
     private string _displayname = string.Empty;
     private FileManager _filemanager;
     private int _folderid = -1;
-    private List<Models.TimeZone> _timezones;
     private string _timezoneid = string.Empty;
+    private string _culturecode = string.Empty;
     private int _photofileid = -1;
     private File _photo = null;
     private string _imagefiles = string.Empty;
@@ -493,12 +510,15 @@
 
             if (PageState.User != null)
             {
+                _timezones = TimeZoneService.GetTimeZones();
+                _languages = await LanguageService.GetLanguagesAsync(PageState.Site.SiteId);
+
                 // identity section
                 _username = PageState.User.Username;
                 _email = PageState.User.Email;
                 _displayname = PageState.User.DisplayName;
-                _timezones = TimeZoneService.GetTimeZones();
                 _timezoneid = PageState.User.TimeZoneId;     
+                _culturecode = PageState.User.CultureCode;
                 var folder = await FolderService.GetFolderAsync(ModuleState.SiteId, PageState.User.FolderPath);
                 if (folder != null)
                 {
@@ -572,6 +592,7 @@
                         user.Email = _email;
                         user.DisplayName = (_displayname == string.Empty ? _username : _displayname);
                         user.TimeZoneId = _timezoneid;
+                        user.CultureCode = _culturecode;
                         user.PhotoFileId = _filemanager.GetFileId();
                         if (user.PhotoFileId == -1)
                         {
@@ -608,6 +629,8 @@
                         {
                             AddModuleMessage(Localizer["Message.Password.Complexity"], MessageType.Error);
                         }
+
+                        await SetCultureAsync(_culturecode);
                     }
                 }
                 else
@@ -629,6 +652,17 @@
         }
     }
 
+    private async Task SetCultureAsync(string culture)
+    {
+        if (culture != CultureInfo.CurrentUICulture.Name)
+        {
+            var localizationCookieValue = CookieRequestCultureProvider.MakeCookieValue(new RequestCulture(PageState.Site.CultureCode, culture));
+            var interop = new Interop(JSRuntime);
+            await interop.SetCookie(CookieRequestCultureProvider.DefaultCookieName, localizationCookieValue, 360, true, "Lax");
+            NavigationManager.NavigateTo(NavigationManager.Uri, true);
+        }
+    }
+    
     private void Cancel()
     {
         NavigationManager.NavigateTo(PageState.ReturnUrl);

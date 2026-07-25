@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Linq;
+using System.Xml.Linq;
 
 namespace Oqtane.Models
 {
@@ -33,6 +35,11 @@ namespace Oqtane.Models
         /// User time zone
         /// </summary>
         public string TimeZoneId { get; set; }
+
+        /// <summary>
+        /// The default culture for the user (ie. en-US)
+        /// </summary>
+        public string CultureCode { get; set; }
 
         /// <summary>
         /// Reference to a <see cref="File"/> containing the users photo.
@@ -128,5 +135,35 @@ namespace Oqtane.Models
         /// </summary>
         [NotMapped]
         public Dictionary<string, string> Settings { get; set; }
+
+        public User Clone()
+        {
+            return new User
+            {
+                UserId = UserId,
+                Username = Username,
+                DisplayName = DisplayName,
+                Email = Email,
+                TimeZoneId = TimeZoneId,
+                CultureCode = CultureCode,
+                PhotoFileId = PhotoFileId,
+                LastLoginOn = LastLoginOn,
+                LastIPAddress = LastIPAddress,
+                TwoFactorRequired = TwoFactorRequired,
+                TwoFactorCode = TwoFactorCode,
+                TwoFactorExpiry = TwoFactorExpiry,
+                SecurityStamp = SecurityStamp,
+                SiteId = SiteId,
+                Roles = Roles,
+                DeletedBy = DeletedBy,
+                DeletedOn = DeletedOn,
+                IsDeleted = IsDeleted,
+                Password = Password,
+                IsAuthenticated = IsAuthenticated,
+                EmailConfirmed = EmailConfirmed,
+                SuppressNotification = SuppressNotification,
+                Settings = Settings.ToDictionary(setting => setting.Key, setting => setting.Value)
+            };
+        }
     }
 }

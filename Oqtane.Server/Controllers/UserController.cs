@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Security.Claims;
-using System.Security.Policy;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
@@ -17,6 +16,7 @@ using Oqtane.Models;
 using Oqtane.Repository;
 using Oqtane.Security;
 using Oqtane.Shared;
+using Oqtane.UI;
 
 namespace Oqtane.Controllers
 {
@@ -294,14 +294,18 @@ namespace Oqtane.Controllers
             return user;
         }
 
-        // POST api/<controller>/forgot
-        [HttpPost("forgot")]
-        public async Task Forgot([FromBody] User user)
+        // GET api/<controller>/forgotpassword/x
+        [HttpGet("forgotpassword/{username}")]
+        public async Task<bool> ForgotPassword(string username)
         {
-            if (ModelState.IsValid)
-            {
-                await _userManager.ForgotPassword(user);
-            }
+            return await _userManager.ForgotPassword(username);
+        }
+
+        // GET api/<controller>/forgotusername/x
+        [HttpGet("forgotusername/{email}")]
+        public async Task<bool> ForgotUsername(string email)
+        {
+            return await _userManager.ForgotUsername(email);
         }
 
         // POST api/<controller>/reset
@@ -331,7 +335,7 @@ namespace Oqtane.Controllers
             return user;
         }
 
-        // GET api/<controller>/validate/x
+        // GET api/<controller>/validate?username=x&email=y&password=z
         [HttpGet("validateuser")]
         public async Task<UserValidateResult> ValidateUser(string username, string email, string password)
         {
@@ -345,17 +349,33 @@ namespace Oqtane.Controllers
             return await _userManager.ValidatePassword(password);
         }
 
-        // GET api/<controller>/token
+        // GET api/<controller>/token?username=x&password=y
         [HttpGet("token")]
-        [Authorize(Roles = RoleNames.Registered)]
-        public string Token()
+        public async Task<string> Token(string username, string password)
         {
             var token = "";
             var sitesettings = HttpContext.GetSiteSettings();
             var secret = sitesettings.GetValue("JwtOptions:Secret", "");
             if (!string.IsNullOrEmpty(secret))
             {
-                token = _jwtManager.GenerateToken(_tenantManager.GetAlias(), (ClaimsIdentity)User.Identity, secret, sitesettings.GetValue("JwtOptions:Issuer", ""), sitesettings.GetValue("JwtOptions:Audience", ""), int.Parse(sitesettings.GetValue("JwtOptions:Lifetime", "20")));
+                var alias = _tenantManager.GetAlias();
+                if (User.Identity.IsAuthenticated)
+                {
+                    token = _jwtManager.GenerateToken(alias, (ClaimsIdentity)User.Identity, secret, sitesettings.GetValue("JwtOptions:Issuer", ""), sitesettings.GetValue("JwtOptions:Audience", ""), int.Parse(sitesettings.GetValue("JwtOptions:Lifetime", "20")));
+                }
+                else
+                {
+                    if (!string.IsNullOrEmpty(username) && !string.IsNullOrEmpty(password))
+                    {
+                        var user = new User { SiteId = alias.SiteId, Username = username, Password = password, LastIPAddress = HttpContext.Connection.RemoteIpAddress?.ToString() };
+                        user = await _userManager.LoginUser(user, false, false);
+                        if (user.IsAuthenticated)
+                        {
+                            var identity = UserSecurity.CreateClaimsIdentity(alias, user);
+                            token = _jwtManager.GenerateToken(alias, identity, secret, sitesettings.GetValue("JwtOptions:Issuer", ""), sitesettings.GetValue("JwtOptions:Audience", ""), int.Parse(sitesettings.GetValue("JwtOptions:Lifetime", "20")));
+                        }
+                    }
+                }
             }
             return token;
         }
@@ -401,54 +421,10 @@ namespace Oqtane.Controllers
         [HttpGet("passwordrequirements/{siteid}")]
         public Dictionary<string, string> PasswordRequirements(int siteid)
         {
-            var requirements = new Dictionary<string, string>();
-
-            var site = _sites.GetSite(siteid);
-            if (site != null && (site.AllowRegistration || User.IsInRole(RoleNames.Registered)))
-            {
-                // get password settings
-                var sitesettings = HttpContext.GetSiteSettings();
-                requirements = sitesettings.Where(item => item.Key.StartsWith("IdentityOptions:Password:"))
-                    .ToDictionary(item => item.Key, item => item.Value);
-            }
-
-            return requirements;
-        }
-
-        // POST api/<controller>/import?siteid=x&fileid=y&notify=z
-        [HttpPost("import")]
-        [Authorize(Roles = RoleNames.Admin)]
-        public async Task<Dictionary<string, string>> Import(string siteid, string fileid, string notify)
-        {
-            if (int.TryParse(siteid, out int SiteId) && SiteId == _tenantManager.GetAlias().SiteId && int.TryParse(fileid, out int FileId) && bool.TryParse(notify, out bool Notify))
-            {
-                var file = _files.GetFile(FileId);
-                if (file != null)
-                {
-                    if (_userPermissions.IsAuthorized(User, PermissionNames.View, file.Folder.PermissionList))
-                    {
-                        return await _userManager.ImportUsers(SiteId, _files.GetFilePath(file), Notify);
-                    }
-                    else
-                    {
-                        _logger.Log(LogLevel.Error, this, LogFunction.Security, "Unauthorized User Import Attempt {SiteId} {FileId}", siteid, fileid);
-                        HttpContext.Response.StatusCode = (int)HttpStatusCode.Forbidden;
-                        return null;
-                    }
-                }
-                else
-                {
-                    _logger.Log(LogLevel.Error, this, LogFunction.Security, "Import File Does Not Exist {SiteId} {FileId}", siteid, fileid);
-                    HttpContext.Response.StatusCode = (int)HttpStatusCode.NotFound;
-                    return null;
-                }
-            }
-            else
-            {
-                _logger.Log(LogLevel.Error, this, LogFunction.Security, "Unauthorized User Import Attempt {SiteId} {FileId}", siteid, fileid);
-                HttpContext.Response.StatusCode = (int)HttpStatusCode.Forbidden;
-                return null;
-            }
+            // get password settings
+            var sitesettings = HttpContext.GetSiteSettings();
+            return sitesettings.Where(item => item.Key.StartsWith("IdentityOptions:Password:"))
+                .ToDictionary(item => item.Key, item => item.Value);
         }
 
         // GET: api/<controller>/passkey?id=x
@@ -558,6 +534,13 @@ namespace Oqtane.Controllers
                 _logger.Log(LogLevel.Error, this, LogFunction.Security, "Unauthorized External Login Delete Attempt {UserId} {Provider} {Key}", id, provider, key);
                 HttpContext.Response.StatusCode = (int)HttpStatusCode.Forbidden;
             }
+        }
+
+        // GET api/<controller>/loginlink/x?y
+        [HttpGet("loginlink/{email}")]
+        public async Task<bool> SendLoginLink(string email, string returnurl)
+        {
+            return await _userManager.SendLoginLink(email, returnurl);
         }
     }
 }

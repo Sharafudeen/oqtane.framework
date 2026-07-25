@@ -1,7 +1,7 @@
 @namespace Oqtane.Modules.Controls
 @inherits LocalizableComponent
 
-@if (Name == Parent.ActiveTab)
+@if (Name.ToLower() == Parent.ActiveTab.ToLower())
 {
     <div id="@(Parent.Id + Name)" class="tab-pane fade show active" role="tabpanel">
         @ChildContent
@@ -29,6 +29,12 @@ else
 
     [Parameter]
     public SecurityAccessLevel? Security { get; set; } // optional - can be used to specify SecurityAccessLevel
+
+    [Parameter]
+    public string RoleName { get; set; } // optional - can be used to specify Role allowed to view this tab
+
+    [Parameter]
+    public string PermissionName { get; set; } // optional - can be used to specify Permission allowed to view this tab
 
     protected override void OnParametersSet()
     {

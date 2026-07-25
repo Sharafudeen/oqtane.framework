@@ -1,8 +1,11 @@
 using System;
+using System.IO;
 using System.Linq;
+using System.Net;
 using System.Reflection;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Cors.Infrastructure;
+using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
@@ -38,14 +41,19 @@ namespace Oqtane.Extensions
 
             // allow oqtane localization middleware
             app.UseOqtaneLocalization();
+            var installation = configuration.GetSection("Installation");
+            var useHttpsRedirection = installation.GetValue<bool>("UseHttpsRedirection");
+            if (useHttpsRedirection)
+            {
+                app.UseHttpsRedirection();
 
-            app.UseHttpsRedirection();
+            }
             app.UseStaticFiles(new StaticFileOptions
             {
                 OnPrepareResponse = (ctx) =>
                 {
                     // static asset caching
-                    var cachecontrol = configuration.GetSection("CacheControl");
+                    var cachecontrol = configuration.GetSection("Caching:Cache-Control");
                     if (!string.IsNullOrEmpty(cachecontrol.Value))
                     {
                         ctx.Context.Response.Headers.Append(HeaderNames.CacheControl, cachecontrol.Value);
@@ -64,12 +72,13 @@ namespace Oqtane.Extensions
             app.UseOutputCache();
             app.UseAuthentication();
             app.UseAuthorization();
+            app.UseNotFoundResponse();
             app.UseAntiforgery();
 
             // execute any IServerStartup logic
             app.ConfigureOqtaneAssemblies(environment);
 
-            if (configuration.GetSection("UseSwagger").Value != "false")
+            if (configuration.GetSection("UseSwagger").Value == "true")
             {
                 app.UseSwagger();
                 app.UseSwaggerUI(c => { c.SwaggerEndpoint("/swagger/" + Constants.Version + "/swagger.json", Constants.PackageId + " " + Constants.Version); });
@@ -121,7 +130,8 @@ namespace Oqtane.Extensions
             var defaultCulture = localizationManager.GetDefaultCulture();
             var supportedCultures = localizationManager.GetSupportedCultures();
 
-            app.UseRequestLocalization(options => {
+            app.UseRequestLocalization(options =>
+            {
                 options.SetDefaultCulture(defaultCulture)
                     .AddSupportedCultures(supportedCultures)
                     .AddSupportedUICultures(supportedCultures);
@@ -146,5 +156,72 @@ namespace Oqtane.Extensions
 
         public static IApplicationBuilder UseExceptionMiddleWare(this IApplicationBuilder builder)
           => builder.UseMiddleware<ExceptionMiddleware>();
+
+        public static IApplicationBuilder UseNotFoundResponse(this IApplicationBuilder app)
+        {
+            // set the route to be rendered on NavigationManager.NotFound()
+            const string notFoundRoute = "/404";
+            app.UseStatusCodePagesWithReExecute(notFoundRoute, createScopeForStatusCodePages: true);
+
+            // middleware to determine if status code pages should be skipped
+            app.Use(async (context, next) =>
+            {
+                var path = context.Request.Path.Value ?? string.Empty;
+                if (ShouldSkipStatusCodeReExecution(path))
+                {
+                    var statusCodePagesFeature = context.Features.Get<IStatusCodePagesFeature>();
+                    if (statusCodePagesFeature != null)
+                    {
+                        statusCodePagesFeature.Enabled = false;
+                    }
+                }
+
+                await next();
+            });
+
+            // middleware to rewrite the path for 404 status code responses on sites using subfolders
+            app.Use(async (context, next) =>
+            {
+                var statusCodeReExecuteFeature = context.Features.Get<IStatusCodeReExecuteFeature>();
+                if (statusCodeReExecuteFeature != null
+                        && context.Response.StatusCode == (int)HttpStatusCode.NotFound
+                        && string.Equals(context.Request.Path.Value, notFoundRoute, StringComparison.OrdinalIgnoreCase))
+                {
+                    var alias = context.GetAlias();
+                    if (!string.IsNullOrEmpty(alias?.Path))
+                    {
+                        var originalPath = context.Request.Path;
+                        context.Request.Path = new PathString($"/{alias.Path}{notFoundRoute}");
+                        try
+                        {
+                            await next();
+                        }
+                        finally
+                        {
+                            context.Request.Path = originalPath;
+                        }
+                        return;
+                    }
+                }
+
+                await next();
+            });
+
+            return app;
+        }
+
+        static bool ShouldSkipStatusCodeReExecution(string path)
+        {
+            // skip requests for framework resources, reserved routes, and static files
+            return path.StartsWith("/_framework/", StringComparison.OrdinalIgnoreCase) ||
+                path.StartsWith("/_content/", StringComparison.OrdinalIgnoreCase) ||
+                Constants.ReservedRoutes.Any(item => path.Contains("/" + item + "/")) ||
+                HasStaticFileExtension(path);
+        }
+
+        static bool HasStaticFileExtension(string path)
+        {
+            return !string.IsNullOrEmpty(Path.GetExtension(path)) && Path.GetExtension(path).Length != 1;
+        }
     }
 }
