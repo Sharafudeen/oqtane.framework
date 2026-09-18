@@ -105,7 +105,7 @@ namespace Oqtane.Services
             return new PngEncoder()
             {
                 ColorType = transparent ? PngColorType.RgbWithAlpha : PngColorType.Rgb,
-                TransparentColorMode = transparent ? PngTransparentColorMode.Preserve : PngTransparentColorMode.Clear,
+                TransparentColorMode = transparent ? TransparentColorMode.Preserve : TransparentColorMode.Clear,
                 BitDepth = PngBitDepth.Bit8,
                 CompressionLevel = PngCompressionLevel.BestSpeed
             };
@@ -117,7 +117,7 @@ namespace Oqtane.Services
             {
                 FileFormat = WebpFileFormatType.Lossy,
                 Quality = 60,
-                TransparentColorMode = transparent ? WebpTransparentColorMode.Preserve : WebpTransparentColorMode.Clear,
+                TransparentColorMode = transparent ? TransparentColorMode.Preserve : TransparentColorMode.Clear,
             };
         }
     }

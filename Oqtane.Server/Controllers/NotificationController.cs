@@ -8,6 +8,7 @@ using Oqtane.Infrastructure;
 using Oqtane.Repository;
 using Oqtane.Security;
 using System.Net;
+using Oqtane.Extensions;
 
 namespace Oqtane.Controllers
 {
@@ -143,15 +144,43 @@ namespace Oqtane.Controllers
         {
             if (ModelState.IsValid && notification.SiteId == _alias.SiteId && (IsAuthorized(notification.FromUserId) || (notification.FromUserId == null && User.IsInRole(RoleNames.Admin))))
             {
+                var valid = true;
+                if (notification.ParentId != null)
+                {
+                    // validate parent
+                    var parent = _notifications.GetNotification(notification.ParentId.Value);
+                    if (parent != null && parent.ToUserId == User.UserId())
+                    {
+                        if (parent.ThreadId == null)
+                        {
+                            parent.ThreadId = parent.NotificationId;
+                            _notifications.UpdateNotification(parent);
+                        }
+                        notification.ThreadId = parent.ThreadId;
+                    }
+                    else
+                    {
+                        valid = false;
+                    }
+                }
                 if (!User.IsInRole(RoleNames.Admin))
                 {
                     // content must be HTML encoded for non-admins to prevent HTML injection
                     notification.Subject = WebUtility.HtmlEncode(notification.Subject);
                     notification.Body = WebUtility.HtmlEncode(notification.Body);
                 }
-                notification = _notifications.AddNotification(notification);
-                _syncManager.AddSyncEvent(_alias, EntityNames.Notification, notification.NotificationId, SyncEventActions.Create);
-                _logger.Log(LogLevel.Information, this, LogFunction.Create, "Notification Added {NotificationId}", notification.NotificationId);
+                if (valid)
+                {
+                    notification = _notifications.AddNotification(notification);
+                    _syncManager.AddSyncEvent(_alias, EntityNames.Notification, notification.NotificationId, SyncEventActions.Create);
+                    _logger.Log(LogLevel.Information, this, LogFunction.Create, "Notification Added {NotificationId}", notification.NotificationId);
+                }
+                else
+                {
+                    _logger.Log(LogLevel.Error, this, LogFunction.Security, "Unauthorized Notification Post Attempt {Notification}", notification);
+                    HttpContext.Response.StatusCode = (int)HttpStatusCode.Forbidden;
+                    notification = null;
+                }
             }
             else
             {

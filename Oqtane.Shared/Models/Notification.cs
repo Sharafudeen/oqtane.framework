@@ -49,9 +49,14 @@ namespace Oqtane.Models
         public string ToEmail { get; set; }
 
         /// <summary>
-        /// Reference to an optional Parent <see cref="Notification"/> - in case it's a kind of thread with reply-messages.
+        /// Reference to a Parent <see cref="Notification"/> in the case where it's a reply to another notification
         /// </summary>
         public int? ParentId { get; set; }
+
+        /// <summary>
+        /// Reference to the original Notification <see cref="Notification"/> in a thread
+        /// </summary>
+        public int? ThreadId { get; set; }
 
         /// <summary>
         /// Message Subject.
