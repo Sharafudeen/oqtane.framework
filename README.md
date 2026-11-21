@@ -12,7 +12,11 @@ Oqtane is being developed based on some fundamental principles which are outline
 
 # Latest Release
 
-[10.2.6](https://github.com/oqtane/oqtane.framework/releases/tag/v10.2.6) was released on September 14, 2026.
+[11.0.0](https://github.com/oqtane/oqtane.framework/releases/tag/v11.0.0) was released on November 18, 2026.
+
+# Oqtane Plus
+
+The power of open source... built for business. [Oqtane Plus](https://www.oqtane.com/products/oqtane-plus) is a commercial support offering for organizations that need more... more confidence, higher accountability, and expert guidance from the official maintainers of the Oqtane platform. Oqtane Plus adds the peace of mind to deploy the Oqtane Framework confidently in production and operate at scale.
 
 # Try It Now!
 
@@ -46,7 +50,7 @@ dotnet run
 
 **Installing using source code from the Dev/Master branch:**
 
-- Install Latest **[.NET  10.0 SDK](https://dotnet.microsoft.com/en-us/download)**.
+- Install Latest **[.NET  11.0 SDK](https://dotnet.microsoft.com/en-us/download)**.
 
 - Install the latest edition of [Visual Studio 2026](https://visualstudio.microsoft.com/downloads) with the **ASP.NET and web development** workload enabled. Oqtane works with ALL editions of Visual Studio from Community to Enterprise. If you wish to use LocalDB for development ( not a requirement as Oqtane supports SQLite, mySQL, and PostgreSQL ) you must also install the **Data storage and processing**.  
 
@@ -112,8 +116,23 @@ Connect with other developers, get support, and share ideas by joining the Oqtan
 This project is open source, and therefore is a work in progress...
 
 Backlog
-- [ ] Folder Providers
 - [ ] Native MCP Server
+
+[11.0.0](https://github.com/oqtane/oqtane.framework/releases/tag/v11.0.0) (Nov 18, 2026)
+- [x] Migration to .NET 11
+- [x] Security patches
+
+[10.3.2](https://github.com/oqtane/oqtane.framework/releases/tag/v10.3.2) (Nov 18, 2026)
+- [x] Stabilization improvements
+- [x] Security patches
+      
+[10.3.1](https://github.com/oqtane/oqtane.framework/releases/tag/v10.3.1) (Nov 4, 2026)
+- [x] Stabilization improvements
+
+[10.3.0](https://github.com/oqtane/oqtane.framework/releases/tag/v10.3.0) (Nov 3, 2026)
+- [x] Storage Providers
+- [x] Content Approval Workflow 
+- [x] Security patches
 
 [10.2.6](https://github.com/oqtane/oqtane.framework/releases/tag/v10.2.6) (Sep 14, 2026)
 - [x] Stabilization improvements

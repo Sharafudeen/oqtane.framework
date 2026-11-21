@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Oqtane.Shared;
 
 namespace Oqtane.Models
 {
@@ -27,11 +28,6 @@ namespace Oqtane.Models
         public int? ParentId { get; set; }
 
         /// <summary>
-        /// Folder type - based on FolderTypes
-        /// </summary>
-        public string Type { get; set; }
-
-        /// <summary>
         /// Folder name
         /// </summary>
         public string Name { get; set; }
@@ -41,6 +37,11 @@ namespace Oqtane.Models
         /// TODO: document from where the path starts
         /// </summary>
         public string Path { get; set; }
+
+        /// <summary>
+        /// The folder storage provider.
+        /// </summary>
+        public string StorageProviderType { get; set; }
 
         /// <summary>
         /// Sorting order of the folder ** not used as folders are sorted in alphabetical order **
@@ -85,7 +86,7 @@ namespace Oqtane.Models
         /// </summary>
         [NotMapped]
         public bool HasChildren { get; set; }
-
+        
         /// <summary>
         /// Indicates if subfolder permissions should be updated to be consistent with parent folder
         /// </summary>
@@ -113,6 +114,29 @@ namespace Oqtane.Models
         [NotMapped]
         [JsonIgnore] // exclude from API payload
         public bool? IsDeleted { get; set; }
+
+        [Obsolete("The Type property is deprecated. Use StorageProviderType instead", false)]
+        [NotMapped]
+        public string Type
+        {
+            get
+            {
+                return StorageProviderType switch
+                {
+                    Constants.PublicStorageProvider => "Public",
+                    Constants.PrivateStorageProvider => "Private",
+                    _ => string.Empty
+                };
+            }
+            set
+            {
+                StorageProviderType = value?.ToLower() switch
+                {
+                    "public" => Constants.PublicStorageProvider,
+                    _ => Constants.PrivateStorageProvider // default to private storage provider
+                };
+            }
+        }
 
         #endregion
     }

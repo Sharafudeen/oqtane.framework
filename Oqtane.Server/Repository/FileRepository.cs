@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -20,8 +21,8 @@ namespace Oqtane.Repository
         File GetFile(int folderId, string fileName);
         File GetFile(int siteId, string folderPath, string fileName);
         void DeleteFile(int fileId);
-        string GetFilePath(int fileId);
-        string GetFilePath(File file);
+        public string GetFilePath(int fileId);
+        public string GetFilePath(File file);
     }
 
     public class FileRepository : IFileRepository
@@ -174,15 +175,20 @@ namespace Oqtane.Repository
             db.SaveChanges();
         }
 
+        private string GetFileUrl(File file, Alias alias)
+        {
+            return Utilities.FileUrl(alias, file.Folder.Path, file.Name);
+        }
+
+        [Obsolete("GetFilePath(int fileId) is only supported for StorageProviders which manage files on the local server", false)]
         public string GetFilePath(int fileId)
         {
             using var db = _dbContextFactory.CreateDbContext();
-            var file = db.File
-                .AsNoTracking()
-                .FirstOrDefault(item => item.FileId == fileId);
+            var file = db.File.Find(fileId);
             return GetFilePath(file);
         }
 
+        [Obsolete("GetFilePath(File file) is only supported for StorageProviders which manage files on the local server", false)]
         public string GetFilePath(File file)
         {
             using var db = _dbContextFactory.CreateDbContext();
@@ -190,11 +196,6 @@ namespace Oqtane.Repository
             var folder = file.Folder ?? db.Folder.AsNoTracking().FirstOrDefault(item => item.FolderId == file.FolderId);
             var filepath = Path.Combine(_folderRepository.GetFolderPath(folder), file.Name);
             return filepath;
-        }
-
-        private string GetFileUrl(File file, Alias alias)
-        {
-            return Utilities.FileUrl(alias, file.Folder.Path, file.Name);
         }
     }
 }
